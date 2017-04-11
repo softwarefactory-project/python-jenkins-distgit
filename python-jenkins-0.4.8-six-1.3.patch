@@ -1,0 +1,87 @@
+From 41f25818fd7bb8703f465ef60128ab7fab864903 Mon Sep 17 00:00:00 2001
+From: Ken Dreyer <ktdreyer@ktdreyer.com>
+Date: Mon, 4 May 2015 10:02:24 -0600
+Subject: [PATCH] support six 1.3
+
+RHEL 7.1 ships python-six-1.3. This old version does not support
+directly importing the various modules we need from six.moves.
+
+Change-Id: I60a5f4be7e17b60f58927b162236d89d4a504135
+---
+ jenkins/__init__.py   | 20 +++++++++++++-------
+ tests/test_jenkins.py | 12 +++++++++---
+ 2 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/jenkins/__init__.py b/jenkins/__init__.py
+index 829f726..aa56b62 100644
+--- a/jenkins/__init__.py
++++ b/jenkins/__init__.py
+@@ -53,11 +53,17 @@
+ import warnings
+ 
+ import six
+-from six.moves.http_client import BadStatusLine
+-from six.moves.urllib.error import HTTPError
+-from six.moves.urllib.error import URLError
+-from six.moves.urllib.parse import quote, urlencode
+-from six.moves.urllib.request import Request, urlopen
++try:
++    from six.moves.http_client import BadStatusLine
++    from six.moves.urllib.error import HTTPError
++    from six.moves.urllib.error import URLError
++    from six.moves.urllib.parse import quote, urlencode
++    from six.moves.urllib.request import Request, urlopen
++except ImportError:
++    # six 1.3
++    from httplib import BadStatusLine
++    from urllib import quote, urlencode
++    from urllib2 import HTTPError, URLError, Request, urlopen
+ 
+ if sys.version_info < (2, 7, 0):
+     warnings.warn("Support for python 2.6 is deprecated and will be removed.")
+@@ -449,10 +455,10 @@
+                     "Error communicating with server[%s]: "
+                     "empty response" % self.server)
+ 
+-            if six.PY2:
++            if sys.version_info[0] == 2:
+                 return response.info().getheader('X-Jenkins')
+ 
+-            if six.PY3:
++            if sys.version_info[0] == 3:
+                 return response.getheader('X-Jenkins')
+ 
+         except (HTTPError, BadStatusLine):
+diff --git a/tests/test_jenkins.py b/tests/test_jenkins.py
+index b59f798..ecb00cf 100644
+--- a/tests/test_jenkins.py
++++ b/tests/test_jenkins.py
+@@ -8,8 +8,13 @@ else:
+ 
+ from mock import patch, Mock
+ import six
+-from six.moves.urllib.error import HTTPError
+-from six.moves.urllib.request import build_opener
++try:
++    from six.moves.urllib.error import HTTPError
++    from six.moves.urllib.request import build_opener
++except ImportError:
++    # six 1.3
++    from urllib2 import HTTPError
++    from urllib2 import build_opener
+ 
+ import jenkins
+ 
+@@ -699,10 +704,10 @@
+         j = jenkins.Jenkins('http://example.com/', 'test', 'test')
+ 
+         mock_response = Mock()
+-        if six.PY2:
++        if sys.version_info[0] == 2:
+             config = {'info.return_value.getheader.return_value': 'Version42'}
+ 
+-        if six.PY3:
++        if sys.version_info[0] == 3:
+             config = {'getheader.return_value': 'Version42'}
+ 
+         mock_response.configure_mock(**config)
